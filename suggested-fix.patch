@@ -1,0 +1,21 @@
+diff --git a/http2.go b/http2.go
+index 06fec8d..f0077c7 100644
+--- a/http2.go
++++ b/http2.go
+@@ -190,6 +190,16 @@ func (proxy *ProxyHttpServer) handleH2MitmStream(
+ 			ctx.Warnf("HTTP/2 MITM: error writing response body: %v", err)
+ 		}
+ 	}
++
++	// Forward HTTP/2 response trailers (e.g. gRPC's grpc-status/grpc-message).
++	// Trailers are only populated once the upstream body has been fully read, so
++	// they are emitted here via http.TrailerPrefix, which the http2 server sends
++	// as trailers at the end of the stream. This streams the body (no buffering).
++	for k, vv := range resp.Trailer {
++		for _, v := range vv {
++			w.Header().Add(http.TrailerPrefix+k, v)
++		}
++	}
+ }
+ 
+ // removeH2HopByHopHeaders deletes HTTP/1.x hop-by-hop headers that are
