@@ -1,21 +1,21 @@
-# goproxy HTTP/2 MITM drops response trailers
+# goproxy HTTP/2 MITM drops response trailers (breaks gRPC)
 
-Minimal, self-contained reproduction of an HTTP/2 **trailer-propagation** bug in goproxy's
-HTTP/2 MITM support (the `http2-mitm` branch, commit
+Self-contained reproduction of an HTTP/2 **trailer-propagation** bug in goproxy's HTTP/2 MITM
+support (the `http2-mitm` branch, commit
 [`565f717`](https://github.com/elazarl/goproxy/commit/565f717a3d408aea4689811ec593768215fbfd07)).
 
 ## TL;DR
 
 When goproxy MITMs an HTTP/2 connection (`ProxyHttpServer.AllowHTTP2 = true`), it forwards the
 upstream response's **headers** and **body** to the client but **drops the response's HTTP/2
-trailers**. This breaks gRPC, which sends call status as the `grpc-status` / `grpc-message`
-trailers — a gRPC client through the proxy fails with:
+trailers**. gRPC carries call status in trailers (`grpc-status` / `grpc-message`), so a gRPC call
+through the proxy reaches the server and returns a reply, but the client fails with:
 
 ```
 rpc error: code = Internal desc = server closed the stream without sending trailers
 ```
 
-The same affects gRPC-Web and Connect streaming, or anything relying on HTTP/2 trailers.
+The same affects anything that relies on HTTP/2 trailers (gRPC-Web, Connect streaming, ...).
 
 ## Prerequisites
 
@@ -27,22 +27,25 @@ The same affects gRPC-Web and Connect streaming, or anything relying on HTTP/2 t
 go run .
 ```
 
-No flags, no setup. The program starts, in-process: an HTTP/2 origin (returns a body **plus
-trailers**), a goproxy MITM (`AllowHTTP2 = true`, `AlwaysMitm`), and two clients — one talking to
-the origin directly, one talking to it **through the goproxy MITM** — then prints what each sees.
+Everything runs in-process: a TLS (h2) gRPC Greeter server, a plain goproxy MITM
+(`AllowHTTP2 = true`, `AlwaysMitm`), and a gRPC client that tunnels through the proxy via HTTP
+CONNECT and calls `SayHello`.
 
 ### Expected output (bug present, against `elazarl/goproxy@565f717`)
 
 ```
-[direct to origin] proto=HTTP/2.0 body="hello from the HTTP/2 origin" trailers=map[Grpc-Message:[OK] Grpc-Status:[0]]
-[via goproxy MITM] proto=HTTP/2.0 body="hello from the HTTP/2 origin" trailers=map[]
+[grpc-server] SayHello name="goproxy" (server was reached)
 
-BUG REPRODUCED: the origin sends HTTP/2 trailers (seen by the direct client),
-but they are DROPPED when the response is proxied through goproxy's HTTP/2 MITM.
+RPC FAILED: rpc error: code = Internal desc = server closed the stream without sending trailers
+
+BUG REPRODUCED: the call reached the gRPC server (see the log line above),
+but its status trailers (grpc-status/grpc-message) were dropped by goproxy's
+HTTP/2 MITM, so the client sees 'server closed the stream without sending trailers'.
 ```
 
-Both requests use HTTP/2; only the proxied one loses the trailers (`trailers=map[]`).
-Exit code: `1` = bug reproduced, `0` = trailers preserved (fixed), `2` = inconclusive.
+The server log line proves the call went all the way through (h2 client → goproxy MITM → h2
+server) and only the trailers are lost. Exit code: `1` = bug reproduced, `0` = trailers preserved
+(fixed).
 
 ## Root cause
 
@@ -96,13 +99,12 @@ for k, vv := range resp.Trailer {
    go mod tidy
    go run .
    ```
-3. The `[via goproxy MITM]` line now shows `trailers=map[Grpc-Message:[OK] Grpc-Status:[0]]` and
-   the program prints `OK: trailers were preserved through the MITM (bug appears fixed).`
+3. It now prints `RPC OK: "Hello goproxy (from real gRPC server over h2)"`.
 
 ## Notes
 
 - The fix uses `http.TrailerPrefix` rather than pre-declaring trailers via the `Trailer` header,
-  because gRPC (and many h2 servers) send **unannounced** trailers whose keys/values are only known
-  after the body.
+  because gRPC (and many h2 servers) send **unannounced** trailers whose keys/values are only
+  known after the body.
 - This reproduction covers **response** trailers (server → client), which is what breaks gRPC.
   Request trailers (client → server) are out of scope.

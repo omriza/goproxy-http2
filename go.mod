@@ -1,10 +1,17 @@
 module github.com/omriza/goproxy-http2
 
-go 1.24.0
-
-require github.com/elazarl/goproxy v1.8.5-0.20260626171535-565f717a3d40
+go 1.25.0
 
 require (
-	golang.org/x/net v0.50.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	github.com/elazarl/goproxy v1.8.5-0.20260626171535-565f717a3d40
+	google.golang.org/grpc v1.82.0
+	google.golang.org/grpc/examples v0.0.0-20260630125735-484f1502aea2
+)
+
+require (
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 )
