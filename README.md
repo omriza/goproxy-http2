@@ -19,7 +19,7 @@ The same affects anything that relies on HTTP/2 trailers (gRPC-Web, Connect stre
 
 ## Prerequisites
 
-- Go 1.24 or newer (`go version`).
+- Go 1.25 or newer (`go version`).
 
 ## Run the reproduction
 
