@@ -4,8 +4,8 @@ github.com/coder/websocket v1.8.14 h1:9L0p0iKiNOibykf283eHkKUHHrpG7f65OE3BhhO7v9
 github.com/coder/websocket v1.8.14/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/elazarl/goproxy v1.8.5-0.20260626171535-565f717a3d40 h1:sX5kr6nAvM9uBsOkivmHQPyNpUXxb6VLpj3dKlovfGk=
-github.com/elazarl/goproxy v1.8.5-0.20260626171535-565f717a3d40/go.mod h1:THdE5ix2clxX9lZzcICPpZ67d6CdrPZxdOYsNgU5e30=
+github.com/elazarl/goproxy v1.8.5-0.20260629113736-2ac13d10e306 h1:LR+G/GExClZUP2d6e4+CghkUAsbbm81lSnkmV5rYJ24=
+github.com/elazarl/goproxy v1.8.5-0.20260629113736-2ac13d10e306/go.mod h1:THdE5ix2clxX9lZzcICPpZ67d6CdrPZxdOYsNgU5e30=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=

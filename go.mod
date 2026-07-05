@@ -3,7 +3,7 @@ module github.com/omriza/goproxy-http2
 go 1.25.0
 
 require (
-	github.com/elazarl/goproxy v1.8.5-0.20260626171535-565f717a3d40
+	github.com/elazarl/goproxy v1.8.5-0.20260629113736-2ac13d10e306
 	google.golang.org/grpc v1.82.0
 	google.golang.org/grpc/examples v0.0.0-20260630125735-484f1502aea2
 )

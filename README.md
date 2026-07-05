@@ -2,7 +2,7 @@
 
 Self-contained reproduction of an HTTP/2 **trailer-propagation** bug in goproxy's HTTP/2 MITM
 support (the `http2-mitm` branch, commit
-[`565f717`](https://github.com/elazarl/goproxy/commit/565f717a3d408aea4689811ec593768215fbfd07)).
+[`2ac13d1`](https://github.com/elazarl/goproxy/commit/2ac13d10e306b54cc0aeb9ecb5d4e268d316aead)).
 
 ## TL;DR
 
@@ -31,7 +31,7 @@ Everything runs in-process: a TLS (h2) gRPC Greeter server, a plain goproxy MITM
 (`AllowHTTP2 = true`, `AlwaysMitm`), and a gRPC client that tunnels through the proxy via HTTP
 CONNECT and calls `SayHello`.
 
-### Expected output (bug present, against `elazarl/goproxy@565f717`)
+### Expected output (bug present, against `elazarl/goproxy@2ac13d1`)
 
 ```
 [grpc-server] SayHello name="goproxy" (server was reached)
@@ -68,20 +68,45 @@ if resp.Body != nil {
 
 ## The fix
 
-See [`suggested-fix.patch`](./suggested-fix.patch). After the body copy — when `resp.Trailer` is
-populated — emit the trailers via `http.TrailerPrefix`, which the `http2.Server` sends as trailers
-at the end of the stream. This **streams the body (no buffering)** and handles *unannounced*
-trailers (how gRPC sends `grpc-status`):
+See [`suggested-fix.patch`](./suggested-fix.patch). It mirrors the trailer handling that
+`handleHttp` in `http.go` already does (the h2 MITM path just never got it). Two parts:
+
+1. **Announce** any pre-known trailers via the `Trailer` header *before* `WriteHeader`, so the
+   `http2.Server` commits to sending a trailing HEADERS frame.
+2. **After the body**, forward `resp.Trailer`: pre-announced trailers are set by name; the rest
+   (HTTP/2 origins / gRPC, which send them *unannounced*) go through `http.TrailerPrefix`. The
+   `Flush` forces chunking so small/buffered bodies don't silently drop the trailers.
+
+This streams the body (no buffering).
 
 ```go
-w.WriteHeader(resp.StatusCode)
-if resp.Body != nil {
-    io.Copy(w, resp.Body)
+// before WriteHeader — announce pre-known trailers:
+announcedTrailers := len(resp.Trailer)
+if announcedTrailers > 0 {
+    trailerKeys := make([]string, 0, announcedTrailers)
+    for k := range resp.Trailer {
+        trailerKeys = append(trailerKeys, k)
+    }
+    w.Header().Add("Trailer", strings.Join(trailerKeys, ", "))
 }
-// Forward HTTP/2 response trailers (e.g. gRPC grpc-status/grpc-message).
-for k, vv := range resp.Trailer {
-    for _, v := range vv {
-        w.Header().Add(http.TrailerPrefix+k, v)
+w.WriteHeader(resp.StatusCode)
+
+// ... io.Copy(w, resp.Body) ...
+
+// after the body — forward trailers:
+if len(resp.Trailer) > 0 {
+    if rc := http.NewResponseController(w); rc != nil {
+        _ = rc.Flush()
+    }
+    if len(resp.Trailer) == announcedTrailers {
+        copyHeaders(w.Header(), resp.Trailer, proxy.KeepDestinationHeaders)
+    } else {
+        for k, vs := range resp.Trailer {
+            k = http.TrailerPrefix + k
+            for _, v := range vs {
+                w.Header().Add(k, v)
+            }
+        }
     }
 }
 ```
@@ -103,8 +128,9 @@ for k, vv := range resp.Trailer {
 
 ## Notes
 
-- The fix uses `http.TrailerPrefix` rather than pre-declaring trailers via the `Trailer` header,
-  because gRPC (and many h2 servers) send **unannounced** trailers whose keys/values are only
-  known after the body.
+- The fix mirrors `handleHttp` in `http.go`: pre-announced trailers are announced via the
+  `Trailer` header and set by name; unannounced trailers (how gRPC sends `grpc-status`) use
+  `http.TrailerPrefix`. gRPC alone only needs the `TrailerPrefix` branch, but announcing keeps
+  the h2 path consistent with the h1 path and `net/http/httputil.ReverseProxy`.
 - This reproduction covers **response** trailers (server → client), which is what breaks gRPC.
   Request trailers (client → server) are out of scope.
