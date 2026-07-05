@@ -1,5 +1,5 @@
 diff --git a/http2.go b/http2.go
-index 06fec8d..7dc3404 100644
+index 06fec8d..f2a9015 100644
 --- a/http2.go
 +++ b/http2.go
 @@ -6,6 +6,7 @@ import (
@@ -10,14 +10,11 @@ index 06fec8d..7dc3404 100644
  	"sync/atomic"
  	"time"
  
-@@ -183,6 +184,19 @@ func (proxy *ProxyHttpServer) handleH2MitmStream(
+@@ -183,6 +184,16 @@ func (proxy *ProxyHttpServer) handleH2MitmStream(
  		w.Header().Del("Content-Length")
  	}
  
-+	// Announce trailers known at this point (pre-announced via the upstream's
-+	// Trailer header). Setting "Trailer" before WriteHeader makes http.Server
-+	// commit to sending a trailing HEADERS frame, which is required for the
-+	// trailers to be forwarded. Mirrors handleHttp in http.go.
++	// Announce pre-known trailers before WriteHeader (see handleHttp in http.go).
 +	announcedTrailers := len(resp.Trailer)
 +	if announcedTrailers > 0 {
 +		trailerKeys := make([]string, 0, announcedTrailers)
@@ -30,19 +27,14 @@ index 06fec8d..7dc3404 100644
  	w.WriteHeader(resp.StatusCode)
  
  	if resp.Body != nil {
-@@ -190,6 +204,30 @@ func (proxy *ProxyHttpServer) handleH2MitmStream(
+@@ -190,6 +201,25 @@ func (proxy *ProxyHttpServer) handleH2MitmStream(
  			ctx.Warnf("HTTP/2 MITM: error writing response body: %v", err)
  		}
  	}
 +
-+	// Forward upstream response trailers (e.g. gRPC's grpc-status/grpc-message).
-+	// Mirrors handleHttp in http.go:
-+	//   1. count == announcedTrailers: every trailer was pre-announced, so
-+	//      http.Server is already looking for them by name — set them directly.
-+	//   2. count > announcedTrailers (HTTP/2 origins, or gRPC which sends them
-+	//      unannounced): use http.TrailerPrefix so http.Server emits them as
-+	//      trailers without the leading announcement. The Flush forces chunking
-+	//      for small/buffered bodies that would otherwise drop trailers.
++	// Forward response trailers after the body: pre-announced by name, the rest
++	// (h2/gRPC send them unannounced) via http.TrailerPrefix; Flush forces
++	// chunking. Mirrors handleHttp in http.go.
 +	if len(resp.Trailer) > 0 {
 +		if rc := http.NewResponseController(w); rc != nil {
 +			_ = rc.Flush()
