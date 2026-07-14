@@ -1,5 +1,6 @@
 # Go build artifacts
 /goproxy-http2
+/streaming/streaming
 *.exe
 *.test
 *.out

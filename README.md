@@ -1,8 +1,22 @@
+# goproxy HTTP/2 MITM reproductions
+
+This repo hosts self-contained reproductions of HTTP/2 MITM bugs on goproxy's `http2-mitm`
+branch, each with a suggested fix:
+
+| Repro | Issue | Status |
+|-------|-------|--------|
+| root (this file) | h2 MITM drops response **trailers** (breaks gRPC status) | fixed and merged on the branch |
+| [`streaming/`](./streaming) | h2 MITM **buffers streamed responses** (breaks gRPC/Connect bidi + server-streaming) | proposed fix, see `streaming/suggested-fix.patch` |
+
+---
+
 # goproxy HTTP/2 MITM drops response trailers (breaks gRPC)
 
 Self-contained reproduction of an HTTP/2 **trailer-propagation** bug in goproxy's HTTP/2 MITM
 support (the `http2-mitm` branch, commit
 [`2ac13d1`](https://github.com/elazarl/goproxy/commit/2ac13d10e306b54cc0aeb9ecb5d4e268d316aead)).
+**This bug is now fixed on the branch;** the reproduction below pins the pre-fix commit so it
+still demonstrates the original failure.
 
 ## TL;DR
 
