@@ -100,7 +100,10 @@ if resp.Body != nil {
                 _ = rc.Flush()
             }
             if er != nil {
-                if er != io.EOF {
+                // Mirror net/http/httputil.ReverseProxy.copyBuffer: io.EOF is the
+                // normal end of stream and context.Canceled means the client went
+                // away or cancelled the request, so neither is worth logging.
+                if er != io.EOF && er != context.Canceled {
                     ctx.Warnf("HTTP/2 MITM: error reading response body: %v", er)
                 }
                 break
@@ -124,8 +127,15 @@ func shouldFlushStreaming(resp *http.Response) bool {
 }
 ```
 
-Adds a `mime` import to `http2.go`. It sits directly before the trailer-forwarding block from the
-earlier fix (which does its own final flush), so the two compose without conflict.
+Adds a `mime` import to `http2.go` (`context` is already imported). It sits directly before the
+trailer-forwarding block from the earlier fix (which does its own final flush), so the two compose
+without conflict.
+
+Edge cases (matching `httputil.ReverseProxy.copyBuffer`): the read loop does not log `io.EOF`
+(normal end of stream) or `context.Canceled` (client went away / cancelled). Write errors are
+logged and stop the copy, which matches goproxy's existing fixed-length `io.Copy` branch; a short
+write surfaces as a non-nil write error per the `io.Writer` contract; and a failed `Flush` is
+benign because the next `Write` then fails and breaks the loop.
 
 ### Verify the fix
 

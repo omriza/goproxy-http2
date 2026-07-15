@@ -1,5 +1,5 @@
 diff --git a/http2.go b/http2.go
-index f2a9015..2190ef4 100644
+index f2a9015..e3d83fe 100644
 --- a/http2.go
 +++ b/http2.go
 @@ -4,6 +4,7 @@ import (
@@ -10,9 +10,9 @@ index f2a9015..2190ef4 100644
  	"net"
  	"net/http"
  	"strings"
-@@ -197,8 +198,32 @@ func (proxy *ProxyHttpServer) handleH2MitmStream(
+@@ -197,8 +198,35 @@ func (proxy *ProxyHttpServer) handleH2MitmStream(
  	w.WriteHeader(resp.StatusCode)
-
+ 
  	if resp.Body != nil {
 -		if _, err := io.Copy(w, resp.Body); err != nil {
 -			ctx.Warnf("HTTP/2 MITM: error writing response body: %v", err)
@@ -31,7 +31,10 @@ index f2a9015..2190ef4 100644
 +					_ = rc.Flush()
 +				}
 +				if er != nil {
-+					if er != io.EOF {
++					// Mirror net/http/httputil.ReverseProxy.copyBuffer: io.EOF is the
++					// normal end of stream and context.Canceled means the client went
++					// away or cancelled the request, so neither is worth logging.
++					if er != io.EOF && er != context.Canceled {
 +						ctx.Warnf("HTTP/2 MITM: error reading response body: %v", er)
 +					}
 +					break
@@ -44,11 +47,11 @@ index f2a9015..2190ef4 100644
 +			}
  		}
  	}
-
-@@ -222,6 +247,16 @@ func (proxy *ProxyHttpServer) handleH2MitmStream(
+ 
+@@ -222,6 +250,16 @@ func (proxy *ProxyHttpServer) handleH2MitmStream(
  	}
  }
-
+ 
 +// shouldFlushStreaming reports whether resp should be forwarded with a flush after
 +// each chunk, mirroring net/http/httputil.ReverseProxy.flushInterval: Server-Sent
 +// Events, or any response with an unknown (-1) Content-Length (gRPC, Connect, chunked).
